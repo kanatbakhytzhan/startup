@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StuLink — Студенческая Экосистема</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="style.css">
+
+    <!-- CRITICAL STYLES FOR WALLET (FIX) -->
+    <style>
+        /* Принудительные стили для модалки кошелька, чтобы она точно открывалась */
+        #walletModalFixed {
+            display: none; /* Скрыто по умолчанию */
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(5px);
+            z-index: 10000;
+            justify-content: center;
+            align-items: center;
+        }
+        /* Этот класс будет добавляться JS-ом */
+        #walletModalFixed.show {
+            display: flex !important;
+            animation: fadeIn 0.3s forwards;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- NAVBAR -->
+   <nav>
+    <!-- Left Group: Logo -->
+    <div class="nav-left">
+        <div class="logo" onclick="app.router('home')">
+            <i class="fas fa-bolt" style="color: var(--primary);"></i> <span class="logo-text">Stu<span class="logo-gradient">Link</span></span>
+        </div>
+    </div>
+
+    <!-- Center Group: Navigation Links (Hidden on Mobile) -->
+    <div class="nav-center">
+        <!-- Navigation links can go here if needed -->
+    </div>
+
+    <!-- Right Group: Actions -->
+    <div class="nav-actions">
+        <!-- Mobile Menu Button (Hidden on Desktop) -->
+        <button id="mobileMenuBtn" class="mobile-menu-btn" onclick="app.toggleMobileDrawer()" aria-label="Menu">
+            <i class="fas fa-bars"></i>
+        </button>
+
+        <!-- Меню пользователя -->
+        <div id="navUser" style="display: none; align-items: center; gap: 15px;">
+            <!-- КНОПКА АДМИН-ПАНЕЛИ (только для админов) -->
+            <button id="navBtnAdmin" class="btn btn-admin btn-icon" style="display: none;" onclick="app.router('admin')">
+                <i class="fas fa-shield-alt"></i>
+            </button>
+
+            <!-- КНОПКА КОШЕЛЬКА (Прямой вызов) -->
+            <button id="navBtnWallet" class="btn btn-secondary btn-icon" onclick="app.toggleWallet()">
+                <i class="fas fa-wallet" style="color: var(--success);"></i>
+            </button>
+
+            <!-- Кнопка уведомлений -->
+            <button id="navBtnNotif" class="btn btn-secondary btn-icon" style="position: relative;" onclick="app.toggleNotifications()">
+                <i class="fas fa-bell"></i>
+                <div id="notifBadge" class="badge-dot" style="display:none;"></div>
+            </button>
+
+            <!-- Theme Toggle -->
+            <button id="themeToggle" class="btn btn-secondary btn-icon" onclick="app.toggleTheme()" title="Переключить тему">
+                <i class="fas fa-moon"></i>
+            </button>
+
+            <!-- Custom Language Switcher (Desktop) -->
+            <div class="lang-switcher-wrapper" id="langSwitcherDesktop">
+                <button class="lang-switcher-btn" onclick="app.toggleLangDropdown()" id="langSwitcherBtn">
+                    <i class="fas fa-globe"></i>
+                    <span id="langCurrentCode">RU</span>
+                    <i class="fas fa-chevron-down" style="font-size: 0.7rem; margin-left: 4px;"></i>
+                </button>
+                <div class="lang-dropdown" id="langDropdown">
+                    <div class="lang-option" onclick="app.selectLanguage('ru')">
+                        <span>Русский</span>
+                    </div>
+                    <div class="lang-option" onclick="app.selectLanguage('en')">
+                        <span>English</span>
+                    </div>
+                    <div class="lang-option" onclick="app.selectLanguage('kz')">
+                        <span>Қазақша</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Профиль -->
+            <div onclick="app.router('profile')" style="cursor: pointer; display: flex; align-items: center; gap: 10px;">
+                <!-- ВАЖНО: добавили класс sm, чтобы аватар был фиксированного размера -->
+                <div class="avatar sm" id="navAvatar">U</div>
+                <div class="nav-user-info">
+                    <span id="navName">User</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Меню гостя -->
+        <div id="navGuest" style="display: flex; gap: 10px; align-items: center;">
+            <button class="btn btn-secondary" data-i18n="BTN_LOGIN" onclick="app.router('login')">Войти</button>
+            <button class="btn btn-primary" data-i18n="BTN_START" onclick="app.router('register')">Start</button>
+        </div>
+    </div>
+</nav>
+
+<!-- Mobile Drawer -->
+<div class="mobile-drawer-overlay" id="mobileDrawerOverlay" onclick="app.toggleMobileDrawer()"></div>
+<div class="mobile-drawer" id="mobileDrawer">
+    <div class="mobile-drawer-item" onclick="app.router('feed'); app.toggleMobileDrawer();">
+        <i class="fas fa-search"></i>
+        <span data-i18n="NAV_FEED">Лента</span>
+    </div>
+    <div class="mobile-drawer-item" onclick="app.router('profile'); app.toggleMobileDrawer();">
+        <i class="fas fa-user"></i>
+        <span data-i18n="NAV_PROFILE">Профиль</span>
+    </div>
+    <div class="mobile-drawer-item" onclick="app.toggleWallet(); app.toggleMobileDrawer();">
+        <i class="fas fa-wallet"></i>
+        <span data-i18n="NAV_WALLET">Кошелёк</span>
+    </div>
+    <div class="mobile-drawer-item" style="flex-direction: column; align-items: flex-start; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 12px; width: 100%;">
+            <i class="fas fa-globe"></i>
+            <span data-i18n="NAV_LANGUAGE">Язык</span>
+        </div>
+        <div class="mobile-lang-options">
+            <button class="mobile-lang-btn" data-lang="ru" onclick="app.selectLanguage('ru'); app.toggleMobileDrawer();">Русский</button>
+            <button class="mobile-lang-btn" data-lang="en" onclick="app.selectLanguage('en'); app.toggleMobileDrawer();">English</button>
+            <button class="mobile-lang-btn" data-lang="kz" onclick="app.selectLanguage('kz'); app.toggleMobileDrawer();">Қазақша</button>
+        </div>
+    </div>
+    <div class="mobile-drawer-item" onclick="app.logout(); app.toggleMobileDrawer();" style="color: var(--danger, #ef4444);">
+        <i class="fas fa-sign-out-alt"></i>
+        <span data-i18n="NAV_LOGOUT">Выйти</span>
+    </div>
+</div>
+
+
+    <!-- 1. HOME PAGE -->
+    <section id="home" class="page active">
+        <div class="hero-container">
+            <div class="hero-badge">
+                ✨ v10.1: Hotfix Release
+            </div>
+            <h1 class="hero-title full-width-title">
+                <span data-i18n="HERO_TITLE_1">Твой скилл</span> —
+                <span class="gradient-text" data-i18n="HERO_TITLE_2">твоя валюта</span>
+            </h1>
+
+            <p class="hero-desc" data-i18n="HERO_DESC">
+                Платформа, где студенты находят исполнителей и зарабатывают на своих навыках. 
+                Безопасная сделка и мгновенные выплаты.
+            </p>
+            <div class="hero-buttons">
+                <button class="btn btn-primary btn-lg" data-i18n="HERO_BTN_START" onclick="app.router('register')">Начать зарабатывать</button>
+                <button class="btn btn-secondary btn-lg" data-i18n="HERO_BTN_FIND" onclick="app.router('feed')">Найти помощь</button>
+            </div>
+
+            <div class="stats-grid glass-card">
+                <div>
+                    <div class="stat-num">1,500+</div>
+                    <div class="stat-label">Студентов</div>
+                </div>
+                <div>
+                    <div class="stat-num">₸ 8.2M</div>
+                    <div class="stat-label">Выплачено</div>
+                </div>
+                <div>
+                    <div class="stat-num">4.9/5</div>
+                    <div class="stat-label">Рейтинг</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 2. FEED PAGE -->
+    <section id="feed" class="page">
+        <div class="feed-header">
+            <h2>Биржа заданий</h2>
+            
+            <div class="search-bar">
+                <i class="fas fa-search"></i>
+                <input
+                     id="feedSearch"
+                     type="text"
+                     placeholder="Поиск (Python, Дизайн...)">
+            </div>
+
+            
+            <button class="btn btn-primary" onclick="app.router('create')">
+                <i class="fas fa-plus"></i> Создать
+            </button>
+        </div>
+        <div id="feedGrid" class="feed-grid"></div>
+    </section>
+
+    <!-- 3. PROFILE PAGE -->
+   <section id="profile" class="page">
+    <div class="profile-container">
+        <div class="glass-card profile-card">
+            <button class="btn btn-secondary btn-icon logout-btn"
+                    onclick="app.logout()"
+                    style="position: absolute; top: 20px; right: 20px;">
+                <i class="fas fa-sign-out-alt"></i>
+            </button>
+
+            <!-- Верхняя плашка профиля -->
+            <div class="profile-header-bg"></div>
+
+            <!-- Аватар профиля (фиксированный размер, центр) -->
+            <div class="avatar profile-avatar" id="profileAvatarBig">U</div>
+
+            <!-- Имя и роль -->
+            <h2 id="profileName" style="margin-bottom: 4px;">User Name</h2>
+            <div id="profileRoleBadge" class="badge">Role</div>
+
+            <!-- Прокачка / уровень (для фрилансера) -->
+            <div id="levelContainer" style="display: none; margin: 20px 40px;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 5px;">
+                    <span id="lvlCurrent">Lvl 1</span>
+                    <span id="xpText">0 / 1000 XP</span>
+                </div>
+                <div class="xp-bar-bg">
+                    <div class="xp-bar-fill" id="xpBar"></div>
+                </div>
+            </div>
+
+            <!-- Статистика -->
+            <div class="profile-stats">
+                <div class="stat-box">
+                    <div class="label">Баланс</div>
+                    <div class="value" id="profileBalance">0 ₸</div>
+                    <button class="btn btn-primary btn-sm btn-full" onclick="app.toggleWallet()">Пополнить</button>
+                </div>
+                <div class="stat-box">
+                    <div class="label" id="statLabel2">Заказов</div>
+                    <div class="value" id="profileActiveCount">0</div>
+                </div>
+            </div>
+
+            <!-- Данные профиля -->
+            <h3 class="section-title">Данные профиля</h3>
+            <div id="profileContent" class="profile-content-grid"></div>
+        </div>
+    </div>
+    </section>
+
+    <!-- PUBLIC PROFILE PAGE -->
+    <section id="user-profile" class="page">
+        <div class="container" style="max-width:900px; margin:0 auto; padding:40px 20px;">
+            <button class="btn btn-secondary btn-sm" onclick="app.router('feed')" style="margin-bottom:20px;">
+                <i class="fas fa-arrow-left"></i> Назад к ленте
+            </button>
+            <div id="publicProfileContent"></div>
+        </div>
+    </section>
+
+    <!-- 4. CREATE PAGE -->
+    <section id="create" class="page">
+        <div class="glass-card form-card">
+            <h2>Новое объявление</h2>
+            <form onsubmit="app.handleCreate(event)">
+                <div class="form-group">
+                    <label>Тип объявления</label>
+                    <div class="toggle-group">
+                        <div class="btn btn-primary toggle-btn" id="typeJobBtn" onclick="app.setPostType('job')">Нужна помощь (Заказ)</div>
+                        <div class="btn btn-secondary toggle-btn" id="typeGigBtn" onclick="app.setPostType('gig')">Предлагаю услугу</div>
+                    </div>
+                    <input type="hidden" id="createType" value="job">
+                </div>
+                <div class="form-group">
+                    <label>Заголовок</label>
+                    <input type="text" id="createTitle" placeholder="Кратко суть..." required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Категория</label>
+                        <select id="createCat">
+                            <option value="dev">IT & Разработка</option>
+                            <option value="design">Дизайн</option>
+                            <option value="text">Текст / Перевод</option>
+                            <option value="study">Учеба</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Бюджет (₸)</label>
+                        <input type="number" id="createPrice" placeholder="5000" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Описание</label>
+                    <textarea id="createDesc" rows="5" placeholder="Подробности..." required></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Прикрепить файл (необязательно)</label>
+                    <input type="file" id="createFileInput" accept=".pdf,.doc,.docx,.zip,.rar,.jpg,.jpeg,.png" style="padding:10px; border:2px dashed #e2e8f0; border-radius:10px; background:#f8fafc; cursor:pointer;">
+                    <small style="color:#94a3b8; font-size:0.8rem; display:block; margin-top:5px;">Можно прикрепить примеры работ, ТЗ или другие файлы</small>
+                </div>
+                <button class="btn btn-primary btn-full">Опубликовать</button>
+            </form>
+        </div>
+    </section>
+
+    <!-- AUTH PAGES -->
+    <section id="login" class="page">
+        <div class="glass-card auth-card">
+            <h2>Вход</h2>
+            <form onsubmit="app.handleLogin(event)">
+                <input type="email" id="loginEmail" placeholder="Email (user0@test.com)" required class="mb-3">
+                <input type="password" id="loginPass" placeholder="Пароль" class="mb-4">
+                <button class="btn btn-primary btn-full">Войти</button>
+            </form>
+            <div class="auth-link">Нет аккаунта? <a href="#" onclick="app.router('register')">Регистрация</a></div>
+        </div>
+    </section>
+
+    <section id="register" class="page">
+        <div class="glass-card auth-card">
+            <h2>Регистрация</h2>
+            <form onsubmit="app.handleRegister(event)">
+                <input type="text" id="regName" placeholder="Имя" required class="mb-3">
+                <input type="email" id="regEmail" placeholder="Email" required class="mb-3">
+                <input type="password" id="regPass" placeholder="Придумайте пароль" required class="mb-3">
+                
+                <select id="regRole" class="mb-3">
+                    <option value="Client">Я Заказчик (Ищу помощь)</option>
+                    <option value="Freelancer">Я Фрилансер (Ищу работу)</option>
+                </select>
+                <button class="btn btn-primary btn-full">Создать аккаунт</button>
+            </form>
+            <div class="auth-link">Уже есть аккаунт? <a href="#" onclick="app.router('login')">Войти</a></div>
+        </div>
+    </section>
+
+    <!-- ADMIN DASHBOARD -->
+    <section id="admin" class="page admin-page">
+        <div class="admin-container">
+            <!-- Admin Header -->
+            <div class="admin-header">
+                <div class="admin-header-left">
+                    <div class="admin-logo">
+                        <i class="fas fa-shield-alt"></i>
+                        <span>Command Center</span>
+                    </div>
+                    <div class="admin-subtitle">StuLink Administration</div>
+                </div>
+                <div class="admin-header-right">
+                    <div class="admin-live-indicator">
+                        <span class="pulse-dot"></span>
+                        <span>LIVE</span>
+                    </div>
+                    <button class="btn btn-admin-secondary" onclick="app.refreshAdminData()">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- Scrollable Content Wrapper -->
+            <div class="admin-scroll-wrapper">
+            
+            <!-- Stats Cards -->
+            <div class="admin-stats-grid" id="adminStatsGrid">
+                <div class="admin-stat-card stat-users">
+                    <div class="stat-icon"><i class="fas fa-users"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="statTotalUsers">-</div>
+                        <div class="stat-label">Total Users</div>
+                        <div class="stat-trend positive" id="statUsersWeek">+0 this week</div>
+                    </div>
+                </div>
+                <div class="admin-stat-card stat-revenue">
+                    <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="statTotalVolume">-</div>
+                        <div class="stat-label">Total Volume</div>
+                        <div class="stat-trend" id="statCommission">Commission: 0 ₸</div>
+                    </div>
+                </div>
+                <div class="admin-stat-card stat-orders">
+                    <div class="stat-icon"><i class="fas fa-clipboard-list"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="statTotalPosts">-</div>
+                        <div class="stat-label">Total Posts</div>
+                        <div class="stat-trend positive" id="statPostsWeek">+0 this week</div>
+                    </div>
+                </div>
+                <div class="admin-stat-card stat-disputes">
+                    <div class="stat-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="statActiveDisputes">-</div>
+                        <div class="stat-label">Active Disputes</div>
+                        <div class="stat-trend warning" id="statTotalDisputes">0 total</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <div class="admin-tabs">
+                <button class="admin-tab active" data-tab="overview" onclick="app.switchAdminTab('overview')">
+                    <i class="fas fa-tachometer-alt"></i> Overview
+                </button>
+                <button class="admin-tab" data-tab="users" onclick="app.switchAdminTab('users')">
+                    <i class="fas fa-users-cog"></i> Users
+                </button>
+                <button class="admin-tab" data-tab="posts" onclick="app.switchAdminTab('posts')">
+                    <i class="fas fa-file-alt"></i> Posts
+                </button>
+                <button class="admin-tab" data-tab="disputes" onclick="app.switchAdminTab('disputes')">
+                    <i class="fas fa-gavel"></i> Disputes
+                </button>
+                <button class="admin-tab" data-tab="financials" onclick="app.switchAdminTab('financials')">
+                    <i class="fas fa-coins"></i> Financials
+                </button>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="admin-content">
+                <!-- Overview Tab -->
+                <div class="admin-tab-content active" id="tab-overview">
+                    <div class="admin-grid-2">
+                        <!-- Recent Users -->
+                        <div class="admin-card">
+                            <div class="admin-card-header">
+                                <h3><i class="fas fa-user-plus"></i> Recent Users</h3>
+                                <a href="#" onclick="app.switchAdminTab('users')" class="admin-link">View All →</a>
+                            </div>
+                            <div class="admin-card-body" id="recentUsersContainer">
+                                <div class="admin-loading">Loading...</div>
+                            </div>
+                        </div>
+
+                        <!-- Recent Posts -->
+                        <div class="admin-card">
+                            <div class="admin-card-header">
+                                <h3><i class="fas fa-file-alt"></i> Recent Posts</h3>
+                                <a href="#" onclick="app.switchAdminTab('posts')" class="admin-link">View All →</a>
+                            </div>
+                            <div class="admin-card-body" id="recentPostsContainer">
+                                <div class="admin-loading">Loading...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Transactions -->
+                    <div class="admin-card" style="margin-top: 20px;">
+                        <div class="admin-card-header">
+                            <h3><i class="fas fa-exchange-alt"></i> Recent Transactions</h3>
+                            <a href="#" onclick="app.switchAdminTab('financials')" class="admin-link">View All →</a>
+                        </div>
+                        <div class="admin-card-body">
+                            <div class="admin-table-container" id="recentTransactionsContainer">
+                                <div class="admin-loading">Loading...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Users Tab -->
+                <div class="admin-tab-content" id="tab-users">
+                    <div class="admin-card">
+                        <div class="admin-card-header">
+                            <h3><i class="fas fa-users-cog"></i> User Management</h3>
+                            <div class="admin-filters">
+                                <input type="text" id="userSearchInput" placeholder="Search users..." class="admin-search">
+                                <select id="userRoleFilter" class="admin-select" onchange="app.loadAdminUsers()">
+                                    <option value="all">All Roles</option>
+                                    <option value="Client">Clients</option>
+                                    <option value="Freelancer">Freelancers</option>
+                                </select>
+                                <select id="userStatusFilter" class="admin-select" onchange="app.loadAdminUsers()">
+                                    <option value="all">All Status</option>
+                                    <option value="active">Active</option>
+                                    <option value="banned">Banned</option>
+                                    <option value="verified">Verified</option>
+                                    <option value="pro">PRO</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="admin-card-body">
+                            <div class="admin-table-container" id="usersTableContainer">
+                                <div class="admin-loading">Loading users...</div>
+                            </div>
+                            <div class="admin-pagination" id="usersPagination"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Posts Tab -->
+                <div class="admin-tab-content" id="tab-posts">
+                    <div class="admin-card">
+                        <div class="admin-card-header">
+                            <h3><i class="fas fa-file-alt"></i> Posts Management</h3>
+                            <div class="admin-filters">
+                                <input type="text" id="postSearchInput" placeholder="Search posts..." class="admin-search">
+                                <select id="postTypeFilter" class="admin-select" onchange="app.loadAdminPosts()">
+                                    <option value="all">All Types</option>
+                                    <option value="job">Jobs</option>
+                                    <option value="gig">Gigs</option>
+                                </select>
+                                <select id="postStatusFilter" class="admin-select" onchange="app.loadAdminPosts()">
+                                    <option value="all">All Status</option>
+                                    <option value="open">Open</option>
+                                    <option value="in_progress">In Progress</option>
+                                    <option value="review">In Review</option>
+                                    <option value="completed">Completed</option>
+                                    <option value="cancelled">Cancelled</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="admin-card-body">
+                            <div class="admin-table-container" id="postsTableContainer">
+                                <div class="admin-loading">Loading posts...</div>
+                            </div>
+                            <div class="admin-pagination" id="postsPagination"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Disputes Tab -->
+                <div class="admin-tab-content" id="tab-disputes">
+                    <div class="admin-card">
+                        <div class="admin-card-header">
+                            <h3><i class="fas fa-gavel"></i> Dispute Resolution</h3>
+                            <div class="admin-filters">
+                                <select id="disputeStatusFilter" class="admin-select" onchange="app.loadAdminDisputes()">
+                                    <option value="all">All Status</option>
+                                    <option value="open">Open</option>
+                                    <option value="under_review">Under Review</option>
+                                    <option value="resolved">Resolved</option>
+                                    <option value="rejected">Rejected</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="admin-card-body">
+                            <div class="admin-table-container" id="disputesTableContainer">
+                                <div class="admin-loading">Loading disputes...</div>
+                            </div>
+                            <div class="admin-pagination" id="disputesPagination"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Financials Tab -->
+                <div class="admin-tab-content" id="tab-financials">
+                    <!-- Admin Balance Card -->
+                    <div class="admin-card" style="margin-bottom: 20px; background: linear-gradient(135deg, #1e293b, #0f172a); border: 1px solid #334155;">
+                        <div class="admin-card-header" style="border-bottom: 1px solid #334155;">
+                            <h3 style="color: #f8fafc;"><i class="fas fa-wallet"></i> Admin Revenue</h3>
+                            <button class="btn btn-primary btn-sm" onclick="app.adminWithdrawRevenue()" id="adminWithdrawBtn">
+                                <i class="fas fa-credit-card"></i> Withdraw Revenue
+                            </button>
+                        </div>
+                        <div style="padding: 20px; text-align: center;">
+                            <div style="font-size: 0.9rem; color: #94a3b8; margin-bottom: 10px;">Total Revenue</div>
+                            <div id="adminBalanceDisplay" style="font-size: 2.5rem; font-weight: 800; color: #f8fafc; font-family: 'Outfit', sans-serif;">0 ₸</div>
+                        </div>
+                    </div>
+
+                    <div class="admin-grid-4" style="margin-bottom: 20px;">
+                        <div class="admin-mini-stat">
+                            <div class="mini-stat-icon green"><i class="fas fa-arrow-up"></i></div>
+                            <div>
+                                <div class="mini-stat-value" id="statTopups">0 ₸</div>
+                                <div class="mini-stat-label">Total Topups</div>
+                            </div>
+                        </div>
+                        <div class="admin-mini-stat">
+                            <div class="mini-stat-icon red"><i class="fas fa-arrow-down"></i></div>
+                            <div>
+                                <div class="mini-stat-value" id="statWithdrawals">0 ₸</div>
+                                <div class="mini-stat-label">Total Withdrawals</div>
+                            </div>
+                        </div>
+                        <div class="admin-mini-stat">
+                            <div class="mini-stat-icon blue"><i class="fas fa-hand-holding-usd"></i></div>
+                            <div>
+                                <div class="mini-stat-value" id="statPayouts">0 ₸</div>
+                                <div class="mini-stat-label">Total Payouts</div>
+                            </div>
+                        </div>
+                        <div class="admin-mini-stat">
+                            <div class="mini-stat-icon orange"><i class="fas fa-undo"></i></div>
+                            <div>
+                                <div class="mini-stat-value" id="statRefunds">0 ₸</div>
+                                <div class="mini-stat-label">Total Refunds</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Commission History -->
+                    <div class="admin-card" style="margin-bottom: 20px;">
+                        <div class="admin-card-header">
+                            <h3><i class="fas fa-coins"></i> Commission History</h3>
+                        </div>
+                        <div class="admin-card-body">
+                            <div class="admin-table-container" id="commissionHistoryContainer">
+                                <div class="admin-loading">Loading commission history...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="admin-card">
+                        <div class="admin-card-header">
+                            <h3><i class="fas fa-history"></i> All Transactions</h3>
+                            <div class="admin-filters">
+                                <select id="transTypeFilter" class="admin-select" onchange="app.loadAdminTransactions()">
+                                    <option value="all">All Types</option>
+                                    <option value="topup">Topups</option>
+                                    <option value="pay_job">Job Payments</option>
+                                    <option value="pay_gig">Gig Payments</option>
+                                    <option value="earn">Earnings</option>
+                                    <option value="withdraw">Withdrawals</option>
+                                    <option value="refund">Refunds</option>
+                                    <option value="commission_earn">Commissions</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="admin-card-body">
+                            <div class="admin-table-container" id="transactionsTableContainer">
+                                <div class="admin-loading">Loading transactions...</div>
+                            </div>
+                            <div class="admin-pagination" id="transactionsPagination"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            </div><!-- End admin-scroll-wrapper -->
+        </div>
+    </section>
+
+    <!-- Ban User Modal -->
+    <div id="banModal" class="modal-overlay" style="display:none;">
+        <div class="modal-box admin-modal">
+            <div class="modal-header">
+                <h3><i class="fas fa-ban"></i> Ban User</h3>
+                <i class="fas fa-times" onclick="app.closeBanModal()" style="cursor:pointer;"></i>
+            </div>
+            <p style="color:#94a3b8; margin-bottom:15px;">
+                This will prevent the user from accessing the platform.
+            </p>
+            <div class="form-group">
+                <label>Ban Reason</label>
+                <select id="banReasonSelect" class="admin-select mb-3">
+                    <option value="Terms violation">Terms of Service Violation</option>
+                    <option value="Fraudulent activity">Fraudulent Activity</option>
+                    <option value="Harassment">Harassment</option>
+                    <option value="Spam">Spam</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Additional Details (optional)</label>
+                <textarea id="banReasonText" rows="3" placeholder="Provide more details..." class="admin-textarea"></textarea>
+            </div>
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button class="btn btn-secondary btn-full" onclick="app.closeBanModal()">Cancel</button>
+                <button class="btn btn-danger btn-full" onclick="app.confirmBanUser()">
+                    <i class="fas fa-ban"></i> Confirm Ban
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resolve Dispute Modal -->
+    <div id="resolveDisputeModal" class="modal-overlay" style="display:none;">
+        <div class="modal-box admin-modal">
+            <div class="modal-header">
+                <h3><i class="fas fa-gavel"></i> Resolve Dispute</h3>
+                <i class="fas fa-times" onclick="app.closeResolveDisputeModal()" style="cursor:pointer;"></i>
+            </div>
+            <div id="disputeDetails" style="margin-bottom:20px;"></div>
+            <div class="form-group">
+                <label>Resolution Decision</label>
+                <textarea id="disputeResolutionText" rows="3" placeholder="Enter your resolution..." class="admin-textarea" required></textarea>
+            </div>
+            <div class="form-group">
+                <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+                    <input type="checkbox" id="disputeRefundCheck" onchange="app.toggleRefundOptions()">
+                    <span>Refund to client</span>
+                </label>
+            </div>
+            <div id="refundOptions" style="display:none; margin-bottom:15px;">
+                <label>Refund Percentage</label>
+                <select id="disputeRefundPercent" class="admin-select">
+                    <option value="100">100% (Full Refund)</option>
+                    <option value="75">75%</option>
+                    <option value="50">50%</option>
+                    <option value="25">25%</option>
+                </select>
+            </div>
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button class="btn btn-secondary btn-full" onclick="app.closeResolveDisputeModal()">Cancel</button>
+                <button class="btn btn-primary btn-full" onclick="app.confirmResolveDispute()">
+                    <i class="fas fa-check"></i> Resolve Dispute
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CHAT WIDGET -->
+    <div class="chat-widget" id="chatWidget">
+        <div class="chat-header">
+            <div class="chat-user-info">
+                <div id="chatTitle">Чат</div>
+            </div>
+            <i class="fas fa-times close-chat" onclick="app.toggleChat()"></i>
+        </div>
+        <div class="chat-body" id="chatBody"></div>
+        <div class="chat-footer">
+            <input type="text" id="chatInput" placeholder="Сообщение..." onkeydown="if(event.key === 'Enter') app.sendMessage()">
+            <button class="btn btn-primary btn-icon-sm" onclick="app.sendMessage()"><i class="fas fa-paper-plane"></i></button>
+        </div>
+    </div>
+    
+    <!-- WALLET MODAL (ВСТРОЕН В HTML ДЛЯ НАДЕЖНОСТИ) -->
+    <!-- ВАЖНО: id="walletModalFixed" используется в JS -->
+    <div id="walletModalFixed" onclick="if(event.target === this) app.toggleWallet()">
+        <div class="modal-box" style="background:white; padding:30px; border-radius:24px; max-width:400px; width:90%; margin:auto;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
+                <h3 style="font-family:'Outfit', sans-serif; font-size:1.5rem; margin:0;">Кошелек</h3>
+                <button onclick="app.toggleWallet()" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+            </div>
+            
+            <div style="background:linear-gradient(135deg, #1e293b, #0f172a); color:white; padding:25px; border-radius:20px; text-align:center; margin-bottom:20px; box-shadow:0 10px 30px rgba(0,0,0,0.2);">
+                <div style="opacity:0.7; font-size:0.9rem;">Ваш баланс</div>
+                <div id="walletAmountDisplay" style="font-size:2.5rem; font-weight:800; font-family:'Outfit', sans-serif;">0 ₸</div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <button class="btn btn-secondary" onclick="app.topUp(1000)">+ 1,000 ₸</button>
+                <button class="btn btn-secondary" onclick="app.topUp(5000)">+ 5,000 ₸</button>
+                <button class="btn btn-secondary" onclick="app.topUp(10000)">+ 10,000 ₸</button>
+                <button class="btn btn-secondary" onclick="app.topUp(20000)">+ 20,000 ₸</button>
+            </div>
+            <div id="walletStatus" style="text-align:center; margin-top:15px; font-size:0.9rem; color:#64748b; min-height:20px;"></div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast">
+        <i class="fas fa-info-circle"></i> <span id="toastMsg">Notification</span>
+    </div>
+    <div id="notifDropdown" class="notif-dropdown" style="display: none;">
+    <div class="notif-header">
+        <span>Уведомления</span>
+        <div style="display:flex; gap:10px; align-items:center;">
+            <small onclick="app.markAllNotificationsRead()" style="cursor:pointer; color:var(--primary);">Отметить все прочитанными</small>
+            <small onclick="app.clearNotifs()" style="cursor:pointer; color:var(--primary);">Очистить</small>
+        </div>
+    </div>
+    <div id="notifList" class="notif-list">
+        <div style="padding:20px; text-align:center; color:#94a3b8; font-size:0.9rem;">Нет новых уведомлений</div>
+    </div>
+</div>
+
+<!-- Модалка: Оценка работы -->
+<div id="reviewModal" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Оцените работу</h3>
+      <i class="fas fa-times"
+         style="cursor:pointer;"
+         onclick="
+           const m = document.getElementById('reviewModal');
+           m.classList.remove('active');
+           setTimeout(()=> m.style.display = 'none', 150);
+         "></i>
+    </div>
+
+    <!-- СЮДА app.approveTask вставляет инфу о файле -->
+    <div id="reviewAttachment" style="margin-bottom:20px;">
+      <div style="border-radius:14px; border:1px dashed #e5e7eb; padding:12px 14px; font-size:0.85rem; color:#9ca3af;">
+        Исполнитель не прикрепил файл к задаче.
+      </div>
+    </div>
+
+    <div style="text-align:center; margin-bottom:20px;">
+      <p style="color:#64748b; margin-bottom:10px;">Как справился исполнитель?</p>
+      <div class="star-rating">
+        <i class="fas fa-star" data-val="1" onclick="app.setStar(1)"></i>
+        <i class="fas fa-star" data-val="2" onclick="app.setStar(2)"></i>
+        <i class="fas fa-star" data-val="3" onclick="app.setStar(3)"></i>
+        <i class="fas fa-star" data-val="4" onclick="app.setStar(4)"></i>
+        <i class="fas fa-star" data-val="5" onclick="app.setStar(5)"></i>
+      </div>
+      <input type="hidden" id="reviewRating" value="5">
+    </div>
+
+    <textarea id="reviewText" rows="3"
+              placeholder="Напишите пару слов (необязательно)..."
+              class="mb-4"></textarea>
+
+    <button class="btn btn-primary btn-full" onclick="app.submitReview()">
+      Подтвердить и Оплатить
+    </button>
+  </div>
+</div>
+
+<!-- Модалка: Сдать работу -->
+<div id="submitModal" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Сдать работу</h3>
+      <i class="fas fa-times"
+         style="cursor:pointer;"
+         onclick="app.closeSubmitModal()"></i>
+    </div>
+
+    <p style="margin-bottom:10px; color:#64748b;">
+      Прикрепите файл с кодом или решением
+    </p>
+
+    <input id="submitFileInput" type="file"
+           style="width:100%; margin-bottom:20px;">
+
+    <button class="btn btn-primary btn-full"
+            onclick="app.confirmSubmitWithFile()">
+      Отправить работу
+    </button>
+  </div>
+</div>
+
+<!-- Модалка: Отменить задачу -->
+<div id="cancelModal" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Отменить задачу</h3>
+      <i class="fas fa-times"
+         style="cursor:pointer;"
+         onclick="app.closeCancelModal()"></i>
+    </div>
+
+    <p style="color:#64748b; margin-bottom:15px;">
+      Укажите причину отмены. Другая сторона должна будет подтвердить отмену.
+    </p>
+
+    <div class="form-group" style="margin-bottom:15px;">
+      <label style="font-size:0.8rem; font-weight:700; color:#64748b; margin-bottom:5px; display:block;">
+        Причина отмены *
+      </label>
+      <select id="cancelReason" class="mb-3" required>
+        <option value="">Выберите причину</option>
+        <option value="client_no_longer_needs">Клиенту больше не нужна услуга</option>
+        <option value="freelancer_unavailable">Исполнитель недоступен</option>
+        <option value="requirements_changed">Требования изменились</option>
+        <option value="quality_issues">Проблемы с качеством</option>
+        <option value="communication_issues">Проблемы с коммуникацией</option>
+        <option value="other">Другое</option>
+      </select>
+    </div>
+
+    <div class="form-group" style="margin-bottom:20px;">
+      <label style="font-size:0.8rem; font-weight:700; color:#64748b; margin-bottom:5px; display:block;">
+        Дополнительные детали (необязательно)
+      </label>
+      <textarea id="cancelDescription" rows="3"
+                placeholder="Опишите ситуацию подробнее..."
+                style="width:100%; padding:14px 18px; border-radius:14px; border:2px solid transparent; background:rgba(255,255,255,0.8); font-family:var(--font-body); font-size:1rem;"></textarea>
+    </div>
+
+    <div style="display:flex; gap:10px;">
+      <button class="btn btn-secondary btn-full" onclick="app.closeCancelModal()">
+        Отмена
+      </button>
+      <button class="btn btn-danger btn-full" onclick="app.handleCancel()">
+        Отправить запрос
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Модалка: Открыть спор -->
+<div id="disputeModal" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Открыть спор</h3>
+      <i class="fas fa-times"
+         style="cursor:pointer;"
+         onclick="app.closeDisputeModal()"></i>
+    </div>
+
+    <p style="color:#64748b; margin-bottom:15px;">
+      Если вы не можете решить проблему самостоятельно, откройте спор. Администрация рассмотрит ваш запрос.
+    </p>
+
+    <div class="form-group" style="margin-bottom:15px;">
+      <label style="font-size:0.8rem; font-weight:700; color:#64748b; margin-bottom:5px; display:block;">
+        Причина спора *
+      </label>
+      <select id="disputeReason" class="mb-3" required>
+        <option value="">Выберите причину</option>
+        <option value="work_not_delivered">Работа не выполнена</option>
+        <option value="quality_issues">Проблемы с качеством</option>
+        <option value="deadline_missed">Пропущен дедлайн</option>
+        <option value="payment_issues">Проблемы с оплатой</option>
+        <option value="communication_issues">Проблемы с коммуникацией</option>
+        <option value="other">Другое</option>
+      </select>
+    </div>
+
+    <div class="form-group" style="margin-bottom:15px;">
+      <label style="font-size:0.8rem; font-weight:700; color:#64748b; margin-bottom:5px; display:block;">
+        Описание проблемы *
+      </label>
+      <textarea id="disputeDescription" rows="4"
+                placeholder="Опишите проблему подробно..."
+                required
+                style="width:100%; padding:14px 18px; border-radius:14px; border:2px solid transparent; background:rgba(255,255,255,0.8); font-family:var(--font-body); font-size:1rem;"></textarea>
+    </div>
+
+    <div class="form-group" style="margin-bottom:20px;">
+      <label style="font-size:0.8rem; font-weight:700; color:#64748b; margin-bottom:5px; display:block;">
+        Прикрепить файлы (необязательно, макс. 5 файлов)
+      </label>
+      <input id="disputeAttachments" type="file" multiple
+             accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.zip"
+             style="width:100%; padding:10px; border-radius:10px; border:2px solid #e2e8f0;">
+      <small style="color:#94a3b8; font-size:0.75rem;">Можно прикрепить скриншоты, документы и другие файлы</small>
+    </div>
+
+    <div style="display:flex; gap:10px;">
+      <button class="btn btn-secondary btn-full" onclick="app.closeDisputeModal()">
+        Отмена
+      </button>
+      <button class="btn btn-danger btn-full" onclick="app.handleDispute()">
+        Открыть спор
+      </button>
+    </div>
+  </div>
+</div>
+
+
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script src="api.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>
