@@ -364,6 +364,28 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
+// Optional auth middleware - sets req.user if token is valid, but doesn't require it
+const optionalAuthMiddleware = async (req, res, next) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        const user = await User.findById(decoded.userId);
+        if (user && !user.isBanned) {
+          req.user = user;
+        }
+      } catch (error) {
+        // Invalid token, but continue as guest
+        req.user = null;
+      }
+    }
+    next();
+  } catch (error) {
+    next();
+  }
+};
+
 // Admin-only middleware
 const requireAdmin = async (req, res, next) => {
   if (!req.user || req.user.role !== 'Admin') {
@@ -401,7 +423,15 @@ app.post('/api/auth/register', async (req, res) => {
 
 app.post('/api/auth/login', async (req, res) => {
   try {
+    // Debug logging
+    console.log('Login request body:', req.body);
+    console.log('Content-Type:', req.get('Content-Type'));
+    
     const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
 
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ error: 'User not found' });
@@ -412,6 +442,7 @@ app.post('/api/auth/login', async (req, res) => {
     const token = jwt.sign({ userId: user._id }, JWT_SECRET);
     res.json({ token, user: sanitizeUser(user) });
   } catch (error) {
+    console.error('Login error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -565,7 +596,7 @@ app.post('/api/posts', authMiddleware, async (req, res) => {
   }
 });
 
-app.get('/api/posts', authMiddleware, async (req, res) => {
+app.get('/api/posts', optionalAuthMiddleware, async (req, res) => {
   try {
     const { 
       type, 
@@ -578,14 +609,20 @@ app.get('/api/posts', authMiddleware, async (req, res) => {
       sortOrder = 'desc' // asc, desc
     } = req.query;
 
-    // Build query
+    // Build query - guests see only open posts, authenticated users see their posts too
     const query = {
       $or: [
-        { status: 'open' },
-        { authorId: req.user._id },
-        { assigneeId: req.user._id }
+        { status: 'open' }
       ]
     };
+
+    // If user is authenticated, also show their own posts (in any status)
+    if (req.user && req.user._id) {
+      query.$or.push(
+        { authorId: req.user._id },
+        { assigneeId: req.user._id }
+      );
+    }
 
     if (type) query.$or[0].type = type;
     if (cat) query.cat = cat;
@@ -623,6 +660,7 @@ app.get('/api/posts', authMiddleware, async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('Get posts error:', error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -717,7 +717,10 @@ const app = {
         return;
     }
 
-    const API_ROOT = 'http://localhost:3000';
+    // Use relative path in production, localhost in development
+    const API_ROOT = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') 
+        ? 'http://localhost:3000' 
+        : '';
 
     try {
         const res = await fetch(`${API_ROOT}/api/posts/${postId}/submit`, {
@@ -811,9 +814,12 @@ const app = {
         fileUrl  = post.submissionFileUrl  || post.fileUrl  || '';
         fileName = post.submissionFileName || post.fileName || 'Файл работы';
 
-        // сервер отдаёт /uploads/..., дополняем хостом
+        // сервер отдаёт /uploads/..., дополняем хостом только в development
         if (fileUrl && fileUrl.startsWith('/')) {
-            fileUrl = 'http://localhost:3000' + fileUrl;
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                fileUrl = 'http://localhost:3000' + fileUrl;
+            }
+            // In production, relative paths work automatically
         }
     }
 
