@@ -251,6 +251,31 @@ const app = {
 
     const icons = { dev: '💻', design: '🎨', text: '✍️', study: '📚' };
 
+    // Show skeleton loading while fetching
+    if (!append) {
+        grid.innerHTML = '';
+        for (let i = 0; i < 4; i++) {
+            grid.innerHTML += `
+                <div class="glass-card skeleton-card skeleton" style="padding:20px;">
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:15px;">
+                        <div class="skeleton-avatar skeleton"></div>
+                        <div style="flex:1;">
+                            <div class="skeleton-text short skeleton" style="margin-bottom:5px;"></div>
+                            <div class="skeleton-text medium skeleton"></div>
+                        </div>
+                    </div>
+                    <div class="skeleton-title skeleton" style="margin-bottom:10px;"></div>
+                    <div class="skeleton-text long skeleton" style="margin-bottom:8px;"></div>
+                    <div class="skeleton-text long skeleton" style="width:70%;"></div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px;">
+                        <div class="skeleton-price skeleton"></div>
+                        <div class="skeleton-text short skeleton" style="width:80px;"></div>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
     try {
         // Get filter values
         const searchEl = document.getElementById('feedSearch');
@@ -763,7 +788,7 @@ const app = {
     const attachBox = document.getElementById('reviewAttachment');
 
     if (!modal || !attachBox) {
-        alert('reviewModal или reviewAttachment не найден в HTML');
+        this.showToast('reviewModal или reviewAttachment не найден в HTML', 'error');
         return;
     }
 
@@ -894,10 +919,10 @@ submitTaskWithFile: async function () {
     modal.classList.remove('active');
     setTimeout(() => modal.style.display = 'none', 150);
 
-    alert('Оплата проведена ✅');
+    this.showToast('Оплата проведена ✅', 'success');
     this.renderFeed();
   } catch (e) {
-    alert('Ошибка оплаты: ' + e.message);
+    this.showToast('Ошибка оплаты: ' + e.message, 'error');
   }
 },
 
@@ -1090,6 +1115,25 @@ submitTaskWithFile: async function () {
 
         let tasksHtml = '<h4 style="margin-bottom:15px; font-family:\'Outfit\', sans-serif;">История задач</h4>';
 
+        // Show skeleton loading while fetching
+        if (contentGrid) {
+            contentGrid.innerHTML = settingsHtml + `
+                <div style="margin-top:20px;">
+                    ${Array.from({length: 3}, () => `
+                        <div class="glass-card skeleton" style="padding:15px; margin-bottom:10px; height:80px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <div style="flex:1;">
+                                    <div class="skeleton-text medium skeleton" style="margin-bottom:8px;"></div>
+                                    <div class="skeleton-text short skeleton" style="width:100px;"></div>
+                                </div>
+                                <div class="skeleton-price skeleton" style="width:80px;"></div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
         try {
             // Fetch all posts (both job and gig types)
             const resultJob = await API.getPosts('job', 1, 100, {});
@@ -1101,7 +1145,17 @@ submitTaskWithFile: async function () {
             const allPosts = [...postsJob, ...postsGig];
             
             const myId = String(user._id || user.id || '');
+            
+            // CRITICAL FIX: Ensure unique tasks by ID to prevent duplicates
+            const seenTaskIds = new Set();
             const myTasks = allPosts.filter(p => {
+                const taskId = String(p._id || p.id || '');
+                // Skip if we've already seen this task
+                if (seenTaskIds.has(taskId)) {
+                    return false;
+                }
+                seenTaskIds.add(taskId);
+                
                 const authorId = String(p.author?._id || p.authorId || '');
                 const assigneeId = String(p.assignee?._id || p.assigneeId || '');
                 return authorId === myId || assigneeId === myId;
@@ -1110,6 +1164,11 @@ submitTaskWithFile: async function () {
                 const dateB = new Date(b.createdAt || b.id || 0);
                 return dateB - dateA;
             });
+            
+            // DEBUG: Log unique tasks count
+            console.log('Unique Tasks Found:', myTasks.length);
+            const completedCount = myTasks.filter(t => t.status === 'completed').length;
+            console.log('Completed Tasks:', completedCount);
 
             if (!myTasks.length) {
                 tasksHtml += `
@@ -1160,8 +1219,19 @@ submitTaskWithFile: async function () {
             const countVal = document.getElementById('profileActiveCount');
             const statLabel2 = document.getElementById('statLabel2');
 
+            // CRITICAL FIX: Reset counter before setting new value
+            if (countVal) {
+                countVal.innerText = '0'; // Reset first
+            }
+            
+            // Calculate stats with reset counters
+            const totalTasks = myTasks.length;
+            const completedTasks = myTasks.filter(t => t.status === 'completed').length;
+            
             statLabel2.innerText = 'Всего задач';
-            countVal.innerText = myTasks.length;
+            if (countVal) {
+                countVal.innerText = totalTasks;
+            }
 
             if (user.role === 'Freelancer') {
                 lvlContainer.style.display = 'block';
@@ -1522,11 +1592,59 @@ handleNewMessage: function (message) {
 
     // ================== 10. ПРОЧЕЕ ==================
     toast: function (msg) {
-        const t = document.getElementById('toast');
-        if (!t) return alert(msg);
-        document.getElementById('toastMsg').innerText = msg;
-        t.style.transform = 'translateX(-50%) translateY(0)';
-        setTimeout(() => t.style.transform = 'translateX(-50%) translateY(100px)', 3000);
+        // Backward compatibility - default to 'info' type
+        this.showToast(msg, 'info');
+    },
+
+    // Modern toast notification system with types
+    showToast: function(message, type = 'info') {
+        // Remove existing toast if any
+        const existingToast = document.getElementById('toast');
+        if (existingToast) {
+            existingToast.remove();
+        }
+
+        // Create toast element
+        const toast = document.createElement('div');
+        toast.id = 'toast';
+        toast.className = `toast toast-${type}`;
+
+        // Icons for different types
+        const icons = {
+            success: 'fas fa-check-circle',
+            error: 'fas fa-exclamation-circle',
+            info: 'fas fa-info-circle'
+        };
+
+        // Colors for different types
+        const colors = {
+            success: '#10b981',
+            error: '#ef4444',
+            info: '#3b82f6'
+        };
+
+        toast.innerHTML = `
+            <i class="${icons[type] || icons.info}" style="color: ${colors[type] || colors.info};"></i>
+            <span id="toastMsg">${message}</span>
+        `;
+
+        // Add to body
+        document.body.appendChild(toast);
+
+        // Trigger animation
+        setTimeout(() => {
+            toast.classList.add('show');
+        }, 10);
+
+        // Auto remove after 3 seconds
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.remove();
+                }
+            }, 300);
+        }, 3000);
     },
 
    toggleNotifications: function () {

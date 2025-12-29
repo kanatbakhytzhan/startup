@@ -3,8 +3,28 @@
  * Handles all communication with the backend server
  */
 
-const API_BASE_URL = 'http://localhost:3000/api';
-const WS_URL       = 'http://localhost:3000';
+// Auto-detect API URL based on environment
+const getApiBaseUrl = () => {
+  // In production (Vercel), use relative URLs
+  if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return '/api';
+  }
+  // In development, use localhost
+  return 'http://localhost:3000/api';
+};
+
+const getWsUrl = () => {
+  // In production (Vercel), use current host with wss:// for secure WebSocket
+  if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${protocol}//${window.location.host}`;
+  }
+  // In development, use localhost
+  return 'http://localhost:3000';
+};
+
+const API_BASE_URL = getApiBaseUrl();
+const WS_URL       = getWsUrl();
 
 class StuLinkAPI {
   constructor() {

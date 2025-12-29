@@ -1567,23 +1567,79 @@ body, p, span, div {
     font-size: 0.9rem;
 }
 
-/* Toast */
+/* Toast Notifications */
 #toast {
     position: fixed;
     bottom: 30px;
-    left: 50%;
-    transform: translateX(-50%) translateY(100px);
-    background: var(--dark);
+    right: 30px;
+    background: rgba(30, 41, 59, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     color: white;
-    padding: 12px 24px;
-    border-radius: 50px;
+    padding: 14px 20px;
+    border-radius: 12px;
     font-weight: 600;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-    transition: 0.4s;
-    z-index: 9999;
+    z-index: 10000;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
+    min-width: 250px;
+    max-width: 400px;
+    opacity: 0;
+    transform: translateX(400px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#toast.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+#toast i {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+#toast span {
+    flex: 1;
+    font-size: 0.95rem;
+    line-height: 1.4;
+}
+
+/* Toast Types */
+.toast-success {
+    background: rgba(16, 185, 129, 0.95) !important;
+    border: 1px solid rgba(16, 185, 129, 0.3) !important;
+    box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3) !important;
+}
+
+.toast-error {
+    background: rgba(239, 68, 68, 0.95) !important;
+    border: 1px solid rgba(239, 68, 68, 0.3) !important;
+    box-shadow: 0 10px 30px rgba(239, 68, 68, 0.3) !important;
+}
+
+.toast-info {
+    background: rgba(59, 130, 246, 0.95) !important;
+    border: 1px solid rgba(59, 130, 246, 0.3) !important;
+    box-shadow: 0 10px 30px rgba(59, 130, 246, 0.3) !important;
+}
+
+/* Mobile Toast */
+@media (max-width: 768px) {
+    #toast {
+        bottom: 20px;
+        right: 20px;
+        left: 20px;
+        max-width: none;
+        transform: translateY(100px);
+    }
+    
+    #toast.show {
+        transform: translateY(0);
+    }
 }
 
 @keyframes slideUp {
@@ -3171,6 +3227,76 @@ input:checked + .slider:before {
     font-size: 0.8rem;
     display: block;
     margin-bottom: 4px;
+}
+
+/* ==================== SKELETON LOADING ==================== */
+.skeleton {
+    background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 12px;
+    opacity: 0.7;
+}
+
+[data-theme="dark"] .skeleton {
+    background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+    background-size: 200% 100%;
+}
+
+[data-theme="light"] .skeleton {
+    background: linear-gradient(90deg, #e2e8f0 25%, #cbd5e1 50%, #e2e8f0 75%);
+    background-size: 200% 100%;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+.skeleton-card {
+    height: 200px;
+    margin-bottom: 20px;
+}
+
+.skeleton-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+}
+
+.skeleton-text {
+    height: 16px;
+    margin-bottom: 8px;
+    border-radius: 4px;
+}
+
+.skeleton-text.short {
+    width: 60%;
+}
+
+.skeleton-text.medium {
+    width: 80%;
+}
+
+.skeleton-text.long {
+    width: 100%;
+}
+
+.skeleton-title {
+    height: 24px;
+    width: 70%;
+    margin-bottom: 12px;
+    border-radius: 6px;
+}
+
+.skeleton-price {
+    height: 28px;
+    width: 100px;
+    border-radius: 6px;
 }
 
 /* Admin Responsive */

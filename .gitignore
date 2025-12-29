@@ -5,6 +5,7 @@ node_modules/
 .env
 .env.local
 .env.production
+.env.*.local
 
 # Logs
 *.log
@@ -29,6 +30,7 @@ Thumbs.db
 # Build files
 dist/
 build/
+.vercel
 
 # Temporary files
 tmp/
