@@ -44,7 +44,31 @@ class StuLinkAPI {
   }
 
   async login(email, password) {
-    const data = await this._fetch('/auth/login', 'POST', { email, password });
+    // CRITICAL: Explicit headers and body formatting
+    const options = {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ email, password })
+    };
+
+    const res = await fetch(`${API_BASE_URL}/auth/login`, options);
+    const text = await res.text();
+
+    let data = {};
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      console.error('Login: Non-JSON response:', text);
+      throw new Error('Server returned invalid response');
+    }
+
+    if (!res.ok) {
+      throw new Error(data.message || data.error || 'Login failed');
+    }
+
     if (data.token) {
       this.token = data.token;
       localStorage.setItem('sl_token', data.token);

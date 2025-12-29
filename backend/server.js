@@ -19,14 +19,36 @@ const io     = socketIo(server, {
   cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
-// ---------- MIDDLEWARE ----------
+// ---------- MIDDLEWARE (STRICT ORDER) ----------
+
+// 1. CORS - MUST BE FIRST (allow all origins for Vercel)
+app.use(cors({
+  origin: '*', // Allow all origins for Vercel deployment
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
+
+// 2. Body Parsing - MUST BE BEFORE ROUTES
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// 3. Security & Compression
 app.use(helmet({
   contentSecurityPolicy: false, // Disable CSP for development (enable in production)
   crossOriginEmbedderPolicy: false
 }));
 app.use(compression());
-app.use(cors());
-app.use(express.json());
+
+// 4. Debug Logging Middleware
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  if (req.method === 'POST' || req.method === 'PUT') {
+    console.log('Request Body:', JSON.stringify(req.body, null, 2));
+    console.log('Content-Type:', req.get('Content-Type'));
+  }
+  next();
+});
 
 // ---------- MONGODB ----------
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/stulink';
@@ -398,11 +420,32 @@ const requireAdmin = async (req, res, next) => {
 
 app.post('/api/auth/register', async (req, res) => {
   try {
+    console.log('=== REGISTER REQUEST ===');
+    console.log('Register Body:', req.body);
+    console.log('Content-Type:', req.get('Content-Type'));
+    
     const { name, email, password, role } = req.body;
 
-    const exists = await User.findOne({ email });
-    if (exists) return res.status(400).json({ error: 'Email already registered' });
+    // Validate required fields
+    if (!name || !email || !password || !role) {
+      console.log('❌ Missing fields');
+      return res.status(400).json({ 
+        message: 'Missing fields',
+        error: 'Name, email, password, and role are required' 
+      });
+    }
 
+    console.log('✅ Fields present, checking if user exists');
+    const exists = await User.findOne({ email });
+    if (exists) {
+      console.log('❌ Email already registered:', email);
+      return res.status(400).json({ 
+        message: 'Email already registered',
+        error: 'Email already registered' 
+      });
+    }
+
+    console.log('✅ Email available, creating user');
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = new User({
       name,
@@ -415,35 +458,70 @@ app.post('/api/auth/register', async (req, res) => {
     await user.save();
     const token = jwt.sign({ userId: user._id }, JWT_SECRET);
 
+    console.log('✅ Registration successful for:', email);
     res.json({ token, user: sanitizeUser(user) });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('❌ Register error:', error);
+    res.status(500).json({ 
+      message: 'Server error',
+      error: error.message 
+    });
   }
 });
 
 app.post('/api/auth/login', async (req, res) => {
   try {
-    // Debug logging
-    console.log('Login request body:', req.body);
+    // CRITICAL: Debug logging at the very start
+    console.log('=== LOGIN REQUEST ===');
+    console.log('Login Body:', req.body);
     console.log('Content-Type:', req.get('Content-Type'));
+    console.log('Headers:', JSON.stringify(req.headers, null, 2));
     
     const { email, password } = req.body;
 
+    // CRITICAL: Validate required fields
     if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
+      console.log('❌ Missing fields - email:', !!email, 'password:', !!password);
+      return res.status(400).json({ 
+        message: 'Missing fields',
+        error: 'Email and password are required',
+        received: { email: !!email, password: !!password }
+      });
     }
 
+    console.log('✅ Fields present, searching for user:', email);
     const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ error: 'User not found' });
+    
+    if (!user) {
+      console.log('❌ User not found:', email);
+      return res.status(400).json({ 
+        message: 'User not found',
+        error: 'Invalid email or password' 
+      });
+    }
 
+    console.log('✅ User found, validating password');
     const valid = await bcrypt.compare(password, user.password);
-    if (!valid) return res.status(400).json({ error: 'Invalid password' });
+    
+    if (!valid) {
+      console.log('❌ Invalid password');
+      return res.status(400).json({ 
+        message: 'Invalid credentials',
+        error: 'Invalid email or password' 
+      });
+    }
 
+    console.log('✅ Password valid, generating token');
     const token = jwt.sign({ userId: user._id }, JWT_SECRET);
+    
+    console.log('✅ Login successful for:', email);
     res.json({ token, user: sanitizeUser(user) });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('❌ Login error:', error);
+    res.status(500).json({ 
+      message: 'Server error',
+      error: error.message 
+    });
   }
 });
 
@@ -598,6 +676,10 @@ app.post('/api/posts', authMiddleware, async (req, res) => {
 
 app.get('/api/posts', optionalAuthMiddleware, async (req, res) => {
   try {
+    console.log('=== GET /api/posts ===');
+    console.log('User authenticated:', !!req.user);
+    console.log('Query params:', req.query);
+    
     const { 
       type, 
       page = 1, 
@@ -618,10 +700,13 @@ app.get('/api/posts', optionalAuthMiddleware, async (req, res) => {
 
     // If user is authenticated, also show their own posts (in any status)
     if (req.user && req.user._id) {
+      console.log('✅ User authenticated, including their posts');
       query.$or.push(
         { authorId: req.user._id },
         { assigneeId: req.user._id }
       );
+    } else {
+      console.log('✅ Guest access - showing only open posts');
     }
 
     if (type) query.$or[0].type = type;
@@ -650,6 +735,7 @@ app.get('/api/posts', optionalAuthMiddleware, async (req, res) => {
       Post.countDocuments(query)
     ]);
 
+    console.log(`✅ Returning ${posts.length} posts (total: ${total})`);
     res.json({
       posts,
       pagination: {
@@ -660,8 +746,11 @@ app.get('/api/posts', optionalAuthMiddleware, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get posts error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('❌ Get posts error:', error);
+    res.status(500).json({ 
+      message: 'Server error',
+      error: error.message 
+    });
   }
 });
 
