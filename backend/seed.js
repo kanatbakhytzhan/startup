@@ -8,8 +8,13 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
+// Load environment variables
+require('dotenv').config();
+
 // Connect to MongoDB
-mongoose.connect('mongodb://localhost:27017/stulink', {
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/stulink';
+
+mongoose.connect(MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 });
