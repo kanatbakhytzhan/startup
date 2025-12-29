@@ -11,6 +11,7 @@ const router = express.Router();
 
 // GET /api/db-status - Check database connection and document counts
 router.get('/db-status', async (req, res) => {
+  console.log('🔍 Debug route hit: /api/debug/db-status');
   try {
     const connection = mongoose.connection;
     

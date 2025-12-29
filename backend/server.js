@@ -12,6 +12,7 @@ const compression = require('compression');
 
 const path   = require('path');
 const multer = require('multer');
+const debugRoutes = require('./routes/debugRoutes');
 
 const app    = express();
 const server = http.createServer(app);
@@ -32,6 +33,9 @@ app.use(cors({
 // 2. Body Parsing - MUST BE BEFORE ROUTES
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// 2.5. DEBUG ROUTES (TEMPORARY - Must be before other routes)
+app.use('/api/debug', debugRoutes);
 
 // 3. Security & Compression
 app.use(helmet({
@@ -441,10 +445,6 @@ const requireAdmin = async (req, res, next) => {
   }
   next();
 };
-
-// ==================== DEBUG ROUTES (TEMPORARY) ====================
-const debugRoutes = require('./routes/debugRoutes');
-app.use('/api/debug', debugRoutes);
 
 // ==================== AUTH ROUTES ====================
 
