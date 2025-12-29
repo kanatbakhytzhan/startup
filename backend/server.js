@@ -53,6 +53,12 @@ app.use((req, res, next) => {
 // ---------- MONGODB ----------
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/stulink';
 
+// DEBUG: Log DB connection info on startup
+console.log('🔍 Server startup debug:');
+console.log('  DB URI length:', process.env.MONGODB_URI ? process.env.MONGODB_URI.length : 'undefined');
+console.log('  DB URI exists:', !!process.env.MONGODB_URI);
+console.log('  Using MONGODB_URI:', MONGODB_URI.substring(0, 20) + '...');
+
 mongoose.connect(MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
@@ -473,7 +479,7 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     // CRITICAL: Debug logging at the very start
     console.log('=== LOGIN REQUEST ===');
-    console.log('Login Body:', req.body);
+    console.log('Login attempt body:', req.body);
     console.log('Content-Type:', req.get('Content-Type'));
     console.log('Headers:', JSON.stringify(req.headers, null, 2));
     
@@ -674,10 +680,10 @@ app.post('/api/posts', authMiddleware, async (req, res) => {
   }
 });
 
-app.get('/api/posts', optionalAuthMiddleware, async (req, res) => {
+// PUBLIC ROUTE: Get all posts (NO AUTH REQUIRED)
+app.get('/api/posts', async (req, res) => {
   try {
-    console.log('=== GET /api/posts ===');
-    console.log('User authenticated:', !!req.user);
+    console.log('=== GET /api/posts (PUBLIC) ===');
     console.log('Query params:', req.query);
     
     const { 
@@ -691,25 +697,12 @@ app.get('/api/posts', optionalAuthMiddleware, async (req, res) => {
       sortOrder = 'desc' // asc, desc
     } = req.query;
 
-    // Build query - guests see only open posts, authenticated users see their posts too
+    // Build query - PUBLIC: show only open posts (anyone can view)
     const query = {
-      $or: [
-        { status: 'open' }
-      ]
+      status: 'open'
     };
 
-    // If user is authenticated, also show their own posts (in any status)
-    if (req.user && req.user._id) {
-      console.log('✅ User authenticated, including their posts');
-      query.$or.push(
-        { authorId: req.user._id },
-        { assigneeId: req.user._id }
-      );
-    } else {
-      console.log('✅ Guest access - showing only open posts');
-    }
-
-    if (type) query.$or[0].type = type;
+    if (type) query.type = type;
     if (cat) query.cat = cat;
     if (minPrice || maxPrice) {
       query.price = {};
@@ -2212,6 +2205,8 @@ app.get('*', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`StuLink Backend running on port ${PORT}`);
-  console.log(`Frontend files served from: ${__dirname}`);
+  console.log(`🚀 StuLink Backend running on port ${PORT}`);
+  console.log(`📁 Frontend files served from: ${path.join(__dirname, '../frontend')}`);
+  console.log(`🔍 Server startup debug - DB URI length:`, process.env.MONGODB_URI ? process.env.MONGODB_URI.length : 'undefined');
+  console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
