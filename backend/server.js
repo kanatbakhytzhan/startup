@@ -442,6 +442,10 @@ const requireAdmin = async (req, res, next) => {
   next();
 };
 
+// ==================== DEBUG ROUTES (TEMPORARY) ====================
+const debugRoutes = require('./routes/debugRoutes');
+app.use('/api/debug', debugRoutes);
+
 // ==================== AUTH ROUTES ====================
 
 app.post('/api/auth/register', async (req, res) => {
