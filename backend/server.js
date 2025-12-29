@@ -122,8 +122,28 @@ const UserSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const PostSchema = new mongoose.Schema({
-  title: { type: String, required: true },
-  desc:  { type: String, required: true },
+  title: { 
+    type: String, 
+    required: [true, 'Please add a title'],
+    trim: true,
+    validate: {
+      validator: function(v) {
+        return v && v.trim().length > 0;
+      },
+      message: 'Title cannot be empty or whitespace only'
+    }
+  },
+  desc:  { 
+    type: String, 
+    required: [true, 'Please add a description'],
+    trim: true,
+    validate: {
+      validator: function(v) {
+        return v && v.trim().length > 0;
+      },
+      message: 'Description cannot be empty or whitespace only'
+    }
+  },
   cat:   { type: String, required: true },
   price: { type: Number, required: true },
   type:  { type: String, enum: ['job', 'gig'], required: true },
@@ -640,6 +660,14 @@ app.post('/api/posts', authMiddleware, async (req, res) => {
   try {
     const { title, cat, price, desc, type } = req.body;
 
+    // CRITICAL: Validate required fields at the very beginning
+    if (!title || !desc || title.trim() === '' || desc.trim() === '') {
+      return res.status(400).json({ 
+        message: 'Title and description are required',
+        error: 'Title and description cannot be empty' 
+      });
+    }
+
     if (type === 'job' && req.user.role !== 'Client') {
       return res.status(403).json({ error: 'Only clients can create jobs' });
     }
@@ -662,11 +690,22 @@ app.post('/api/posts', authMiddleware, async (req, res) => {
       }).save();
     }
 
+    // Trim and validate before creating post
+    const trimmedTitle = title ? title.trim() : '';
+    const trimmedDesc = desc ? desc.trim() : '';
+
+    if (!trimmedTitle || !trimmedDesc) {
+      return res.status(400).json({ 
+        message: 'Title and description are required',
+        error: 'Title and description cannot be empty' 
+      });
+    }
+
     const post = new Post({
-      title,
+      title: trimmedTitle,
       cat,
       price,
-      desc,
+      desc: trimmedDesc,
       type,
       authorId:   req.user._id,
       authorName: req.user.name,
@@ -676,6 +715,15 @@ app.post('/api/posts', authMiddleware, async (req, res) => {
     await post.save();
     res.json(post);
   } catch (error) {
+    // Handle Mongoose validation errors
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(e => e.message).join(', ');
+      return res.status(400).json({ 
+        message: 'Validation failed',
+        error: messages 
+      });
+    }
+    console.error('Post creation error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -697,9 +745,21 @@ app.get('/api/posts', async (req, res) => {
       sortOrder = 'desc' // asc, desc
     } = req.query;
 
-    // Build query - PUBLIC: show only open posts (anyone can view)
+    // Build query - PUBLIC: show only open posts with valid titles (anyone can view)
     const query = {
-      status: 'open'
+      status: 'open',
+      title: { 
+        $exists: true, 
+        $ne: null, 
+        $ne: '',
+        $not: { $regex: /^\s*$/ } // Not just whitespace
+      },
+      desc: { 
+        $exists: true, 
+        $ne: null, 
+        $ne: '',
+        $not: { $regex: /^\s*$/ } // Not just whitespace
+      }
     };
 
     if (type) query.type = type;
